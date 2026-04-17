@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f4f4f4; }
+        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        button { background: #0088cc; color: white; border: none; padding: 10px 20px; border-radius: 5px; margin-top: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2 id="title">Test Yuklanmoqda...</h2>
+        <p id="info">Sun'iy intellekt savollarni tayyorlamoqda...</p>
+        <button onclick="tg.close()">Yopish</button>
+    </div>
+
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.expand(); // Oynani to'liq ochish
+
+        // URL'dan ma'lumotlarni olish
+        const params = new URLSearchParams(window.location.search);
+        const subject = params.get('subject');
+        const grade = params.get('grade');
+        const quarter = params.get('quarter');
+
+        document.getElementById('title').innerText = subject.toUpperCase() + " testi";
+        document.getElementById('info').innerText = grade + "-sinf, " + quarter + "-chorak savollari bu yerda chiqadi.";
+    </script>
+</body>
+</html>
