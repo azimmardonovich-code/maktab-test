@@ -1,32 +1,119 @@
 <!DOCTYPE html>
-<html>
+<html lang="uz">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <title>77-Maktab Test Tizimi</title>
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f4f4f4; }
-        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        button { background: #0088cc; color: white; border: none; padding: 10px 20px; border-radius: 5px; margin-top: 20px; cursor: pointer; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f3f4f6; padding: 15px; margin: 0; color: #333; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .option { display: block; background: #ffffff; border: 2px solid #e5e7eb; padding: 12px; margin: 10px 0; border-radius: 10px; cursor: pointer; transition: 0.3s; }
+        .option:hover { border-color: #0088cc; background: #f0f9ff; }
+        .correct { background: #dcfce7 !important; border-color: #22c55e !important; color: #166534; }
+        .wrong { background: #fee2e2 !important; border-color: #ef4444 !important; color: #991b1b; }
+        .explanation { margin-top: 10px; padding: 12px; background: #fef9c3; border-radius: 8px; font-size: 0.9em; display: none; border-left: 4px solid #facc15; }
+        #loading { text-align: center; margin-top: 50px; font-size: 1.2em; color: #0088cc; font-weight: bold; }
+        .send-btn { width: 100%; padding: 15px; background: #0088cc; color: white; border: none; border-radius: 12px; font-size: 1.1em; font-weight: bold; display: none; cursor: pointer; margin-top: 20px; }
+        .disabled { pointer-events: none; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2 id="title">Test Yuklanmoqda...</h2>
-        <p id="info">Sun'iy intellekt savollarni tayyorlamoqda...</p>
-        <button onclick="tg.close()">Yopish</button>
-    </div>
+
+    <div id="loading">🚀 Sun'iy intellekt savollarni tayyorlamoqda...</div>
+    <div id="quiz-container"></div>
+    <button id="finish-btn" class="send-btn" onclick="sendResultToBot()">Natijani yuborish</button>
 
     <script>
         let tg = window.Telegram.WebApp;
-        tg.expand(); // Oynani to'liq ochish
+        tg.expand();
 
-        // URL'dan ma'lumotlarni olish
+        // --- DIQQAT: API KEYNI SHU YERGA QO'YING ---
+        const API_KEY = "AQ.Ab8RN6IXwxcsB_N2pOPQs11zJEWA-00GUwqE-MTwYPp_b_g-mQ"; 
+
         const params = new URLSearchParams(window.location.search);
-        const subject = params.get('subject');
-        const grade = params.get('grade');
-        const quarter = params.get('quarter');
+        const subject = params.get('subject') || 'Umumiy';
+        const grade = params.get('grade') || '7';
+        const quarter = params.get('quarter') || '1';
 
-        document.getElementById('title').innerText = subject.toUpperCase() + " testi";
-        document.getElementById('info').innerText = grade + "-sinf, " + quarter + "-chorak savollari bu yerda chiqadi.";
+        let correctCount = 0;
+        let totalQs = 0;
+
+        async function generateQuestions() {
+            const prompt = `Menga ${subject} fanidan ${grade}-sinf, ${quarter}-chorak bo'yicha 5 ta test savoli tuz. 
+            Har bir savolda: savol matni, 3 ta variant va to'g'ri javob indeksi (0, 1 yoki 2) bo'lsin. 
+            Shuningdek, har bir savol uchun qisqa tahlil (tushuntirish) ham yoz.
+            Javobni FAQAT mana bu JSON formatida ber: [{"s": "savol", "o": ["v1", "v2", "v3"], "t": 0, "ex": "tushuntirish"}]`;
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`, {
+                    method: "POST",
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({"contents": [{"parts": [{"text": prompt}]}]})
+                });
+                
+                const data = await response.json();
+                const text = data.candidates[0].content.parts[0].text;
+                const cleanJson = text.replace(/```json|```/g, "").trim();
+                const questions = JSON.parse(cleanJson);
+                
+                totalQs = questions.length;
+                renderQuiz(questions);
+            } catch (error) {
+                document.getElementById('loading').innerHTML = "❌ Xatolik yuz berdi. <br> API kalit yoki internetni tekshiring.";
+                console.error(error);
+            }
+        }
+
+        function renderQuiz(qs) {
+            document.getElementById('loading').style.display = 'none';
+            const container = document.getElementById('quiz-container');
+
+            qs.forEach((q, qIdx) => {
+                let html = `
+                <div class="card">
+                    <b>${qIdx + 1}. ${q.s}</b>
+                    <div id="options-${qIdx}">
+                        ${q.o.map((opt, oIdx) => `
+                            <div class="option" onclick="selectOption(this, ${oIdx}, ${q.t}, ${qIdx})">${opt}</div>
+                        `).join('')}
+                    </div>
+                    <div id="ex-${qIdx}" class="explanation"><b>💡 Tahlil:</b> ${q.ex}</div>
+                </div>`;
+                container.innerHTML += html;
+            });
+
+            document.getElementById('finish-btn').style.display = 'block';
+        }
+
+        function selectOption(element, chosenIdx, correctIdx, qIdx) {
+            const optionsDiv = document.getElementById(`options-${qIdx}`);
+            if (optionsDiv.classList.contains('disabled')) return;
+
+            optionsDiv.classList.add('disabled');
+            document.getElementById(`ex-${qIdx}`).style.display = 'block';
+
+            if (chosenIdx === correctIdx) {
+                element.classList.add('correct');
+                correctCount++;
+            } else {
+                element.classList.add('wrong');
+                optionsDiv.children[correctIdx].classList.add('correct');
+            }
+        }
+
+        function sendResultToBot() {
+            const resultData = {
+                score: correctCount,
+                total: totalQs,
+                subject: subject
+            };
+            tg.sendData(JSON.stringify(resultData));
+            tg.close();
+        }
+
+        generateQuestions();
     </script>
 </body>
 </html>
